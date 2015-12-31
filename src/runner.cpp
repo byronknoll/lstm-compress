@@ -17,7 +17,7 @@ int main(int argc, char* argv[]) {
   is.read(buffer, len);
   is.close();
 
-  LstmCompress lstm;
+  LstmCompress lstm(500);
   valarray<float> probs = lstm.Perceive(buffer[0]);
   double entropy = log2(1.0/256);
   for (unsigned int pos = 1; pos < len; ++pos) {
