@@ -3,32 +3,29 @@
 #include <algorithm>
 #include <math.h>
 
-LstmCompress::LstmCompress(unsigned int num_cells) : output_(256),
-    state_(num_cells), hidden_(num_cells + 1), input_(257 + num_cells) {
-  output_ = 1.0 / 256;
-  state_ = 0;
-  hidden_ = 0;
+LstmCompress::LstmCompress(unsigned int num_cells, float learning_rate) :
+    output_(1.0 / 256, 256), state_(num_cells), hidden_(num_cells + 1),
+    input_(257 + num_cells), probs_(1.0 / 256, 256),
+    forget_gate_(std::valarray<float>(0.0, input_.size()), num_cells),
+    input_gate_(std::valarray<float>(0.0, input_.size()), num_cells),
+    candidate_gate_(std::valarray<float>(0.0, input_.size()), num_cells),
+    output_gate_(std::valarray<float>(0.0, input_.size()), num_cells),
+    output_layer_(std::valarray<float>(0.0, hidden_.size()), 256),
+    learning_rate_(learning_rate) {
   hidden_[hidden_.size() - 1] = 1;
-  input_ = 0;
   input_[input_.size() - 1] = 1;
-  forget_gate_.resize(num_cells);
-  input_gate_.resize(num_cells);
-  candidate_gate_.resize(num_cells);
-  output_gate_.resize(num_cells);
-  for (unsigned int i = 0; i < num_cells; ++i) {
-    forget_gate_[i].resize(input_.size());
-    input_gate_[i].resize(input_.size());
-    candidate_gate_[i].resize(input_.size());
-    output_gate_[i].resize(input_.size());
-  }
-  output_layer_.resize(256);
-  for (unsigned int i = 0; i < 256; ++i) {
-    output_layer_[i].resize(hidden_.size());
-  }
 }
 
-std::valarray<float>& LstmCompress::Perceive(unsigned char val) {
-  return output_;
+std::valarray<float>& LstmCompress::Perceive(unsigned char input) {
+  ForwardPass(input);
+  probs_ = output_;
+  double sum = probs_.sum();
+  if (sum == 0) {
+    probs_ = 1.0 / 256;
+  } else {
+    probs_ /= sum;
+  }
+  return probs_;
 }
 
 void LstmCompress::ForwardPass(unsigned char input) {
