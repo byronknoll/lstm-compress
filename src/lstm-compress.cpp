@@ -28,19 +28,23 @@ std::valarray<float>& LstmCompress::Perceive(unsigned char input) {
   return probs_;
 }
 
+inline float Logistic(float val) {
+  return 1 / (1 + exp(-val));
+}
+
 void LstmCompress::ForwardPass(unsigned char input) {
   std::fill_n(begin(input_), 256, 0);
   input_[input] = 1;
   std::copy(begin(hidden_), end(hidden_), begin(input_) + 256);
   for (unsigned int i = 0; i < state_.size(); ++i) {
-    state_[i] *= 1 / (1 + exp(-(input_ * forget_gate_[i]).sum()));
-    state_[i] += (1 / (1 + exp(-(input_ * input_gate_[i]).sum()))) *
-        (tanh((input_ * candidate_gate_[i]).sum()));
-    hidden_[i] = (1 / (1 + exp(-(input_ * output_gate_[i]).sum()))) *
-        tanh(state_[i]);
+    state_[i] *= Logistic((input_ * forget_gate_[i]).sum());
+    state_[i] += Logistic((input_ * input_gate_[i]).sum()) *
+        (4 * Logistic((input_ * candidate_gate_[i]).sum()) - 2);
+    hidden_[i] = (Logistic((input_ * output_gate_[i]).sum())) *
+        (2 * Logistic(state_[i]) - 1);
   }
   for (unsigned int i = 0; i < 256; ++i) {
-    output_[i] = (1 / (1 + exp(-(hidden_ * output_layer_[i]).sum())));
+    output_[i] = Logistic((hidden_ * output_layer_[i]).sum());
   }
 }
 
