@@ -3,12 +3,17 @@
 #include <algorithm>
 #include <math.h>
 
-LstmCompress::LstmCompress(unsigned int num_cells, float learning_rate) :
-    LstmCompress(num_cells, learning_rate, 0xDEADBEEF) {}
-
+namespace {
 inline float Rand() {
   return static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
 }
+inline float Logistic(float val) {
+  return 1 / (1 + exp(-val));
+}
+}
+
+LstmCompress::LstmCompress(unsigned int num_cells, float learning_rate) :
+    LstmCompress(num_cells, learning_rate, 0xDEADBEEF) {}
 
 LstmCompress::LstmCompress(unsigned int num_cells, float learning_rate,
     unsigned int seed) : output_(1.0 / 256, 256), state_(num_cells),
@@ -49,10 +54,6 @@ std::valarray<float>& LstmCompress::Perceive(unsigned char input) {
     probs_ /= sum;
   }
   return probs_;
-}
-
-inline float Logistic(float val) {
-  return 1 / (1 + exp(-val));
 }
 
 void LstmCompress::ForwardPass(unsigned char input) {
