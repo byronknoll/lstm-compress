@@ -6,6 +6,7 @@
 class LstmCompress {
  public:
   LstmCompress(unsigned int num_cells, float learning_rate);
+  LstmCompress(unsigned int num_cells, float learning_rate, unsigned int seed);
   std::valarray<float>& Perceive(unsigned char input);
 
  private:
