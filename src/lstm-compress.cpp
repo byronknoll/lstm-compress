@@ -36,6 +36,7 @@ LstmCompress::LstmCompress(unsigned int num_cells, float learning_rate,
       candidate_gate_[i][j] = low + Rand() * range;
       output_gate_[i][j] = low + Rand() * range;
     }
+    forget_gate_[i][forget_gate_[i].size() - 1] = 1;
   }
   for (unsigned int i = 0; i < output_layer_.size(); ++i) {
     for (unsigned int j = 0; j < output_layer_[i].size(); ++j) {
