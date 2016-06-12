@@ -19,8 +19,8 @@ LstmCompress::LstmCompress(unsigned int num_cells, float learning_rate,
     unsigned int seed) : output_(1.0 / 256, 256), state_(num_cells),
     hidden_(num_cells + 1), input_(257 + num_cells), probs_(1.0 / 256, 256),
     forget_gate_(std::valarray<float>(0.0, input_.size()), num_cells),
+    input_node_(std::valarray<float>(0.0, input_.size()), num_cells),
     input_gate_(std::valarray<float>(0.0, input_.size()), num_cells),
-    candidate_gate_(std::valarray<float>(0.0, input_.size()), num_cells),
     output_gate_(std::valarray<float>(0.0, input_.size()), num_cells),
     output_layer_(std::valarray<float>(0.0, hidden_.size()), 256),
     learning_rate_(learning_rate) {
@@ -32,8 +32,8 @@ LstmCompress::LstmCompress(unsigned int num_cells, float learning_rate,
   for (unsigned int i = 0; i < forget_gate_.size(); ++i) {
     for (unsigned int j = 0; j < forget_gate_[i].size(); ++j) {
       forget_gate_[i][j] = low + Rand() * range;
+      input_node_[i][j] = low + Rand() * range;
       input_gate_[i][j] = low + Rand() * range;
-      candidate_gate_[i][j] = low + Rand() * range;
       output_gate_[i][j] = low + Rand() * range;
     }
     forget_gate_[i][forget_gate_[i].size() - 1] = 1;
@@ -63,10 +63,9 @@ void LstmCompress::ForwardPass(unsigned char input) {
   std::copy(begin(hidden_), end(hidden_) - 1, begin(input_) + 256);
   for (unsigned int i = 0; i < state_.size(); ++i) {
     state_[i] *= Logistic((input_ * forget_gate_[i]).sum());
-    state_[i] += Logistic((input_ * input_gate_[i]).sum()) *
-        (4 * Logistic((input_ * candidate_gate_[i]).sum()) - 2);
-    hidden_[i] = Logistic((input_ * output_gate_[i]).sum()) *
-        (2 * Logistic(state_[i]) - 1);
+    state_[i] += Logistic((input_ * input_node_[i]).sum()) *
+        tanh((input_ * input_gate_[i]).sum());
+    hidden_[i] = Logistic((input_ * output_gate_[i]).sum()) * tanh(state_[i]);
   }
   for (unsigned int i = 0; i < 256; ++i) {
     output_[i] = Logistic((hidden_ * output_layer_[i]).sum());
