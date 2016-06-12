@@ -43,9 +43,15 @@ LstmCompress::LstmCompress(unsigned int num_cells, float learning_rate,
       output_layer_[i][j] = low + Rand() * range;
     }
   }
+  ForwardPass(0);
 }
 
 std::valarray<float>& LstmCompress::Perceive(unsigned char input) {
+  BackwardPass(input);
+  return Predict(input);
+}
+
+std::valarray<float>& LstmCompress::Predict(unsigned char input) {
   ForwardPass(input);
   probs_ = output_;
   double sum = probs_.sum();
@@ -72,3 +78,6 @@ void LstmCompress::ForwardPass(unsigned char input) {
   }
 }
 
+void LstmCompress::BackwardPass(unsigned char input) {
+
+}
