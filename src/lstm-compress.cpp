@@ -79,5 +79,10 @@ void LstmCompress::ForwardPass(unsigned char input) {
 }
 
 void LstmCompress::BackwardPass(unsigned char input) {
-
+  for (unsigned int i = 0; i < 256; ++i) {
+    float update = learning_rate_;
+    if (i == input) update *= (1 - output_[i]);
+    else update *= -output_[i];
+    output_layer_[i] += update * hidden_;
+  }
 }
