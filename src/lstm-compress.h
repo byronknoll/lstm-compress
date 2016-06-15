@@ -13,7 +13,10 @@ class LstmCompress {
  private:
   void ForwardPass(unsigned char input);
   void BackwardPass(unsigned char input);
-  std::valarray<float> output_, state_, hidden_, input_, probs_;
+  std::valarray<float> output_, state_, hidden_, input_, probs_, hidden_error_,
+      tanh_state_, output_gate_error_, output_gate_state_, state_error_,
+      input_node_state_, input_gate_state_, input_node_error_,
+      input_gate_error_, forget_gate_error_, last_state_, forget_gate_state_;
   std::valarray<std::valarray<float>> forget_gate_, input_node_,
       input_gate_, output_gate_, output_layer_;
   float learning_rate_;
