@@ -111,9 +111,9 @@ void LstmCompress::BackwardPass(unsigned char input) {
   forget_gate_error_ = state_error_ * last_state_ * forget_gate_state_ *
       (1.0f - forget_gate_state_);
   for (unsigned int i = 0; i < input_node_.size(); ++i) {
-    input_node_[i] += (learning_rate_ * input_node_error_) * input_;
-    input_gate_[i] += (learning_rate_ * input_gate_error_) * input_;
-    forget_gate_[i] += (learning_rate_ * forget_gate_error_) * input_;
-    output_gate_[i] += (learning_rate_ * output_gate_error_) * input_;
+    input_node_[i] += (learning_rate_ * input_node_error_[i]) * input_;
+    input_gate_[i] += (learning_rate_ * input_gate_error_[i]) * input_;
+    forget_gate_[i] += (learning_rate_ * forget_gate_error_[i]) * input_;
+    output_gate_[i] += (learning_rate_ * output_gate_error_[i]) * input_;
   }
 }
