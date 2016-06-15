@@ -19,16 +19,14 @@ int main(int argc, char* argv[]) {
   is.seekg(0, std::ios::end);
   unsigned long long len = is.tellg();
   is.seekg(0, std::ios::beg);
-  char* buffer = new char[len];
-  is.read(buffer, len);
-  is.close();
 
-  LstmCompress lstm(10, 0.1);
-  valarray<float> probs = lstm.Perceive(buffer[0]);
+  LstmCompress lstm(40, 0.2);
+  valarray<float> probs = lstm.Perceive(is.get());
   double entropy = log2(1.0/256);
   for (unsigned int pos = 1; pos < len; ++pos) {
-    entropy += log2(probs[(unsigned char)buffer[pos]]);
-    probs = lstm.Perceive(buffer[pos]);
+    int c = is.get();
+    entropy += log2(probs[(unsigned char)c]);
+    probs = lstm.Perceive(c);
   }
   entropy = -entropy / len;
   unsigned long long output_bytes = entropy * len / 8;
@@ -36,5 +34,5 @@ int main(int argc, char* argv[]) {
       len, output_bytes,
       ((double)clock() - start) / CLOCKS_PER_SEC);
   printf("cross entropy: %.4f\n", entropy);
-  delete[] buffer;
+  is.close();
 }
