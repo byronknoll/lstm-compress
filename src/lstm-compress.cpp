@@ -77,8 +77,8 @@ void LstmCompress::ForwardPass(unsigned char input) {
   for (unsigned int i = 0; i < state_.size(); ++i) {
     forget_gate_state_[i] = Logistic((input_ * forget_gate_[i]).sum());
     state_[i] *= forget_gate_state_[i];
-    input_node_state_[i] = Logistic((input_ * input_node_[i]).sum());
-    input_gate_state_[i] = tanh((input_ * input_gate_[i]).sum());
+    input_node_state_[i] = tanh((input_ * input_node_[i]).sum());
+    input_gate_state_[i] = Logistic((input_ * input_gate_[i]).sum());
     state_[i] += input_node_state_[i] * input_gate_state_[i];
     tanh_state_[i] = tanh(state_[i]);
     output_gate_state_[i] = Logistic((input_ * output_gate_[i]).sum());
@@ -102,7 +102,7 @@ void LstmCompress::BackwardPass(unsigned char input) {
   }
   output_gate_error_ = tanh_state_ * hidden_error_ * output_gate_state_ *
       (1.0f - output_gate_state_);
-  state_error_ += hidden_error_ * output_gate_state_ * (1.0f -
+  state_error_ = hidden_error_ * output_gate_state_ * (1.0f -
       (tanh_state_ * tanh_state_));
   input_node_error_ = state_error_ * input_gate_state_ * (1.0f -
       (input_node_state_ * input_node_state_));

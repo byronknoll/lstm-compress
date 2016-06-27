@@ -25,7 +25,7 @@ int main(int argc, char* argv[]) {
   unsigned long long len = is.tellg();
   is.seekg(0, std::ios::beg);
 
-  LstmCompress lstm(200, 0.2);
+  LstmCompress lstm(40, 0.2);
   valarray<float> probs = lstm.Perceive(is.get());
   double entropy = log2(1.0/256);
   for (unsigned int pos = 1; pos < len; ++pos) {
