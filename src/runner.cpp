@@ -8,14 +8,19 @@
 
 using namespace std;
 
+inline float Rand() {
+  return static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
+}
+
 int main(int argc, char* argv[]) {
-  if (argc != 2) {
+  if (argc != 3) {
     printf("Wrong number of arguments.\n");
     return 0;
   }
   clock_t start = clock();
   std::ifstream is;
   is.open(argv[1], std::ios::binary);
+  if (!is.is_open()) return -1;
   is.seekg(0, std::ios::end);
   unsigned long long len = is.tellg();
   is.seekg(0, std::ios::beg);
@@ -35,4 +40,18 @@ int main(int argc, char* argv[]) {
       ((double)clock() - start) / CLOCKS_PER_SEC);
   printf("cross entropy: %.4f\n", entropy);
   is.close();
+
+  std::ofstream os(argv[2], std::ios::out | std::ios::binary);
+  if (!os.is_open()) return -1;
+  for (int i = 0; i < 20000; ++i) {
+    float r = Rand();
+    int c = 0;
+    for (; c < 256; ++c) {
+      r -= probs[c];
+      if (r < 0) break;
+    }
+    probs = lstm.Predict(c);
+    os.put(c);
+  }
+  os.close();
 }
