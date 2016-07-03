@@ -10,7 +10,7 @@ all: build runner
 
 debug: CFLAGS += -ggdb
 debug: LFLAGS += -ggdb
-debug: build runner generator
+debug: build runner
 
 runner: $(OBJS) src/runner.cpp
 	$(CC) $(LFLAGS) $(OBJS) src/runner.cpp -o runner
