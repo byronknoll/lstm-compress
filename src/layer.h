@@ -1,0 +1,24 @@
+#ifndef LAYER_H
+#define LAYER_H
+
+#include <valarray>
+
+class Layer {
+ public:
+  Layer(unsigned int num_input, unsigned int num_cells, float learning_rate);
+  const std::valarray<float>& ForwardPass(const std::valarray<float>& input);
+  const std::valarray<float>& BackwardPass(const std::valarray<float>& input,
+      const std::valarray<float>& hidden_error);
+
+ private:
+  std::valarray<float> state_, hidden_, hidden_error_, tanh_state_,
+      output_gate_error_, output_gate_state_, state_error_, input_node_state_,
+      input_gate_state_, input_node_error_, input_gate_error_,
+      forget_gate_error_, last_state_, forget_gate_state_;
+  std::valarray<std::valarray<float>> forget_gate_, input_node_, input_gate_,
+      output_gate_;
+  float learning_rate_;
+  unsigned int num_cells_;
+};
+
+#endif

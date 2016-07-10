@@ -2,24 +2,23 @@
 #define LSTM_COMPRESS_H
 
 #include <valarray>
+#include <memory>
+
+#include "layer.h"
 
 class LstmCompress {
  public:
-  LstmCompress(unsigned int num_cells, float learning_rate);
-  LstmCompress(unsigned int num_cells, float learning_rate, unsigned int seed);
+  LstmCompress(unsigned int num_cells, unsigned int num_layers,
+      float learning_rate);
   std::valarray<float>& Perceive(unsigned char input);
   std::valarray<float>& Predict(unsigned char input);
 
  private:
-  void ForwardPass(unsigned char input);
-  void BackwardPass(unsigned char input);
-  std::valarray<float> output_, state_, hidden_, input_, probs_, hidden_error_,
-      tanh_state_, output_gate_error_, output_gate_state_, state_error_,
-      input_node_state_, input_gate_state_, input_node_error_,
-      input_gate_error_, forget_gate_error_, last_state_, forget_gate_state_;
-  std::valarray<std::valarray<float>> forget_gate_, input_node_,
-      input_gate_, output_gate_, output_layer_;
+  std::vector<std::unique_ptr<Layer>> layers_;
+  std::valarray<float> output_, probs_, hidden_, hidden_error_;
+  std::valarray<std::valarray<float>> layer_input_, output_layer_;
   float learning_rate_;
+  unsigned int num_cells_;
 };
 
 #endif
