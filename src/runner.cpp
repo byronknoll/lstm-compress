@@ -26,13 +26,18 @@ int main(int argc, char* argv[]) {
   unsigned long long len = is.tellg();
   is.seekg(0, std::ios::beg);
 
-  LstmCompress lstm(40, 2, 0.2);
+  LstmCompress lstm(40, 3, 0.1);
   valarray<float> probs = lstm.Perceive(is.get());
+  unsigned long long percent = 1 + (len / 100);
   double entropy = log2(1.0/256);
-  for (unsigned int pos = 1; pos < len; ++pos) {
+  for (unsigned int pos = 0; pos < len - 1; ++pos) {
     int c = is.get();
     entropy += log2(probs[(unsigned char)c]);
     probs = lstm.Perceive(c);
+    if (pos % percent == 0) {
+      printf("\rprogress: %lld%%", pos / percent);
+      fflush(stdout);
+    }
   }
   entropy = -entropy / len;
   unsigned long long output_bytes = entropy * len / 8;
