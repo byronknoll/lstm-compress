@@ -72,11 +72,11 @@ std::valarray<float>& LstmCompress::Predict(unsigned char input) {
     output_[i] = Logistic((hidden_ * output_layer_[i]).sum());
   }
   probs_ = output_;
-  double sum = probs_.sum();
-  if (sum == 0) {
-    probs_ = 1.0 / 256;
-  } else {
-    probs_ /= sum;
+  double sum = 0, min = 0.000001;
+  for (int i = 0; i < 256; ++i) {
+    if (probs_[i] < min) probs_[i] = min;
+    sum += probs_[i];
   }
+  probs_ /= sum;
   return probs_;
 }
