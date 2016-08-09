@@ -26,7 +26,7 @@ int main(int argc, char* argv[]) {
   unsigned long long len = is.tellg();
   is.seekg(0, std::ios::beg);
 
-  LstmCompress lstm(40, 3, 0.1);
+  LstmCompress lstm(40, 3, 10, 0.1);
   valarray<float> probs = lstm.Perceive(is.get());
   unsigned long long percent = 1 + (len / 100);
   double entropy = log2(1.0/256);

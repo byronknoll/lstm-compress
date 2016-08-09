@@ -8,17 +8,20 @@
 
 class LstmCompress {
  public:
-  LstmCompress(unsigned int num_cells, unsigned int num_layers,
+  LstmCompress(unsigned int num_cells, unsigned int num_layers, int horizon,
       float learning_rate);
   std::valarray<float>& Perceive(unsigned char input);
   std::valarray<float>& Predict(unsigned char input);
 
  private:
   std::vector<std::unique_ptr<Layer>> layers_;
-  std::valarray<float> output_, probs_, hidden_, hidden_error_;
-  std::valarray<std::valarray<float>> layer_input_, output_layer_;
+  std::vector<unsigned char> input_history_;
+  std::valarray<float> probs_, hidden_, hidden_error_;
+  std::valarray<std::valarray<std::valarray<float>>> layer_input_,
+      output_layer_;
+  std::valarray<std::valarray<float>> output_;
   float learning_rate_;
-  unsigned int num_cells_;
+  unsigned int num_cells_, epoch_, horizon_;
 };
 
 #endif
