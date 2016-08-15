@@ -67,15 +67,22 @@ const std::valarray<float>& Layer::ForwardPass(const std::valarray<float>&
 
 const std::valarray<float>& Layer::BackwardPass(const std::valarray<float>&
     input, const std::valarray<float>& hidden_error, int epoch) {
-  if (epoch < (int)horizon_ - 1) {
-    stored_error_ += hidden_error;
-  } else {
+  if (epoch == (int)horizon_ - 1) {
     stored_error_ = hidden_error;
+    state_error_ = 0;
+    for (unsigned int i = 0; i < input_node_.size(); ++i) {
+      forget_gate_update_[i] = 0;
+      input_node_update_[i] = 0;
+      input_gate_update_[i] = 0;
+      output_gate_update_[i] = 0;
+    }
+  } else {
+    stored_error_ += hidden_error;
   }
 
   output_gate_error_ = tanh_state_[epoch] * stored_error_ *
       output_gate_state_[epoch] * (1.0f - output_gate_state_[epoch]);
-  state_error_ = stored_error_ * output_gate_state_[epoch] * (1.0f -
+  state_error_ += stored_error_ * output_gate_state_[epoch] * (1.0f -
       (tanh_state_[epoch] * tanh_state_[epoch]));
   input_node_error_ = state_error_ * input_gate_state_[epoch] * (1.0f -
       (input_node_state_[epoch] * input_node_state_[epoch]));
@@ -98,6 +105,7 @@ const std::valarray<float>& Layer::BackwardPass(const std::valarray<float>&
   }
 
   if (epoch > 0) {
+    state_error_ *= forget_gate_state_[epoch];
     stored_error_ = 0;
     for (unsigned int i = 0; i < input_node_.size(); ++i) {
       for (unsigned int j = 256; j < 256 + num_cells_; ++j) {
@@ -109,14 +117,6 @@ const std::valarray<float>& Layer::BackwardPass(const std::valarray<float>&
     }
   }
 
-  if (epoch == (int)horizon_ - 1) {
-    for (unsigned int i = 0; i < input_node_.size(); ++i) {
-      forget_gate_update_[i] = 0;
-      input_node_update_[i] = 0;
-      input_gate_update_[i] = 0;
-      output_gate_update_[i] = 0;
-    }
-  }
   for (unsigned int i = 0; i < input_node_.size(); ++i) {
     forget_gate_update_[i] += (learning_rate_ * forget_gate_error_[i]) * input;
     input_node_update_[i] += (learning_rate_ * input_node_error_[i]) * input;
