@@ -4,7 +4,7 @@
 #include <valarray>
 #include <math.h>
 
-#include "lstm-compress.h"
+#include "lstm.h"
 
 using namespace std;
 
@@ -26,7 +26,7 @@ int main(int argc, char* argv[]) {
   unsigned long long len = is.tellg();
   is.seekg(0, std::ios::beg);
 
-  LstmCompress lstm(40, 3, 10, 0.1);
+  Lstm lstm(0, 40, 3, 10, 0.1);
   valarray<float> probs = lstm.Perceive(is.get());
   unsigned long long percent = 1 + (len / 100);
   double entropy = log2(1.0/256);

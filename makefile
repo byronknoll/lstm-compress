@@ -2,7 +2,7 @@ CC = g++
 CFLAGS = -std=c++11 -Wall -c
 LFLAGS = -std=c++11 -Wall
 
-OBJS = build/lstm-compress.o build/layer.o
+OBJS = build/lstm.o build/layer.o
 
 all: CFLAGS += -Ofast -march=native -s
 all: LFLAGS += -Ofast -march=native -s
@@ -15,8 +15,8 @@ debug: build runner
 runner: $(OBJS) src/runner.cpp
 	$(CC) $(LFLAGS) $(OBJS) src/runner.cpp -o runner
 
-build/lstm-compress.o: src/lstm-compress.h src/lstm-compress.cpp src/layer.h
-	$(CC) $(CFLAGS) src/lstm-compress.cpp -o build/lstm-compress.o
+build/lstm.o: src/lstm.h src/lstm.cpp src/layer.h
+	$(CC) $(CFLAGS) src/lstm.cpp -o build/lstm.o
 
 build/layer.o: src/layer.h src/layer.cpp
 	$(CC) $(CFLAGS) src/layer.cpp -o build/layer.o
