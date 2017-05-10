@@ -1,63 +1,251 @@
-#include <iostream>
-#include <ctime>
 #include <fstream>
-#include <valarray>
-#include <math.h>
+#include <ctime>
+#include <stdio.h>
+#include <cstdlib>
 
-#include "lstm.h"
+#include "preprocess/preprocessor.h"
+#include "coder/encoder.h"
+#include "coder/decoder.h"
+#include "predictor.h"
 
-using namespace std;
-
-inline float Rand() {
-  return static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
+int Help() {
+  printf("lstm-compress v1\n");
+  printf("With preprocessing:\n");
+  printf("    compress:           lstm-compress -c [dictionary] [input]"
+      " [output]\n");
+  printf("    only preprocessing: lstm-compress -s [dictionary] [input]"
+      " [output]\n");
+  printf("    decompress:         lstm-compress -d [dictionary] [input]"
+      " [output]\n");
+  printf("Without preprocessing:\n");
+  printf("    compress:   lstm-compress -c [input] [output]\n");
+  printf("    decompress: lstm-compress -d [input] [output]\n");
+  return -1;
 }
 
-int main(int argc, char* argv[]) {
-  if (argc != 3) {
-    printf("Wrong number of arguments.\n");
-    return 0;
+void WriteHeader(unsigned long long length, std::ofstream* os) {
+  for (int i = 4; i >= 0; --i) {
+    char c = length >> (8*i);
+    os->put(c);
   }
-  srand(0xDEADBEEF);
-  clock_t start = clock();
-  std::ifstream is;
-  is.open(argv[1], std::ios::binary);
-  if (!is.is_open()) return -1;
-  is.seekg(0, std::ios::end);
-  unsigned long long len = is.tellg();
-  is.seekg(0, std::ios::beg);
+}
 
-  Lstm lstm(0, 40, 3, 10, 0.1);
-  valarray<float> probs = lstm.Perceive(is.get());
-  unsigned long long percent = 1 + (len / 100);
-  double entropy = log2(1.0/256);
-  for (unsigned int pos = 0; pos < len - 1; ++pos) {
-    int c = is.get();
-    entropy += log2(probs[(unsigned char)c]);
-    probs = lstm.Perceive(c);
+void WriteHeader(unsigned long long length, FILE* out) {
+  for (int i = 4; i >= 0; --i) {
+    char c = length >> (8*i);
+    putc(c, out);
+  }
+}
+
+void ReadHeader(std::ifstream* is, unsigned long long* length) {
+  *length = 0;
+  for (int i = 0; i < 5; ++i) {
+    *length <<= 8;
+    *length += (unsigned char)(is->get());
+  }
+}
+
+void Compress(unsigned long long input_bytes, std::ifstream* is,
+    std::ofstream* os, unsigned long long* output_bytes) {
+  Predictor p;
+  Encoder e(os, &p);
+  unsigned long long percent = 1 + (input_bytes / 100);
+  for (unsigned long long pos = 0; pos < input_bytes; ++pos) {
+    char c = is->get();
+    for (int j = 7; j >= 0; --j) {
+      e.Encode((c>>j)&1);
+    }
     if (pos % percent == 0) {
       printf("\rprogress: %lld%%", pos / percent);
       fflush(stdout);
     }
   }
-  entropy = -entropy / len;
-  unsigned long long output_bytes = entropy * len / 8;
-  printf("\r%lld bytes -> %lld bytes in %1.2f s.\n",
-      len, output_bytes,
-      ((double)clock() - start) / CLOCKS_PER_SEC);
-  printf("cross entropy: %.4f\n", entropy);
-  is.close();
+  e.Flush();
+  *output_bytes = os->tellp();
+}
 
-  std::ofstream os(argv[2], std::ios::out | std::ios::binary);
-  if (!os.is_open()) return -1;
-  for (int i = 0; i < 20000; ++i) {
-    float r = Rand();
-    int c = 0;
-    for (; c < 256; ++c) {
-      r -= probs[c];
-      if (r < 0) break;
+void Decompress(unsigned long long output_length, std::ifstream* is,
+                std::ofstream* os) {
+  Predictor p;
+  Decoder d(is, &p);
+  unsigned long long percent = 1 + (output_length / 100);
+  for(unsigned long long pos = 0; pos < output_length; ++pos) {
+    int byte = 1;
+    while (byte < 256) {
+      byte += byte + d.Decode();
     }
-    probs = lstm.Predict(c);
-    os.put(c);
+    os->put(byte);
+    if (pos % percent == 0) {
+      printf("\rprogress: %lld%%", pos / percent);
+      fflush(stdout);
+    }
   }
-  os.close();
+}
+
+bool Store(const std::string& input_path, const std::string& temp_path,
+    const std::string& output_path, FILE* dictionary,
+    unsigned long long* input_bytes, unsigned long long* output_bytes) {
+  FILE* data_in = fopen(input_path.c_str(), "rb");
+  if (!data_in) return false;
+  FILE* data_out = fopen(output_path.c_str(), "wb");
+  if (!data_out) return false;
+  fseek(data_in, 0L, SEEK_END);
+  *input_bytes = ftell(data_in);
+  fseek(data_in, 0L, SEEK_SET);
+  WriteHeader(0, data_out);
+  preprocessor::encode(data_in, data_out, *input_bytes, temp_path, dictionary);
+  fseek(data_out, 0L, SEEK_END);
+  *output_bytes = ftell(data_out);
+  fclose(data_in);
+  fclose(data_out);
+  return true;
+}
+
+bool RunCompression(bool enable_preprocess, const std::string& input_path,
+    const std::string& temp_path, const std::string& output_path,
+    FILE* dictionary, unsigned long long* input_bytes,
+    unsigned long long* output_bytes) {
+  std::string path = temp_path;
+  if (enable_preprocess) {
+    FILE* data_in = fopen(input_path.c_str(), "rb");
+    if (!data_in) return false;
+    FILE* temp_out = fopen(temp_path.c_str(), "wb");
+    if (!temp_out) return false;
+
+    fseek(data_in, 0L, SEEK_END);
+    *input_bytes = ftell(data_in);
+    fseek(data_in, 0L, SEEK_SET);
+
+    preprocessor::encode(data_in, temp_out, *input_bytes, temp_path,
+        dictionary);
+    fclose(data_in);
+    fclose(temp_out);
+  } else {
+    path = input_path;
+  }
+
+  std::ifstream temp_in(path, std::ios::in | std::ios::binary);
+  if (!temp_in.is_open()) return false;
+  std::ofstream data_out(output_path, std::ios::out | std::ios::binary);
+  if (!data_out.is_open()) return false;
+
+  temp_in.seekg(0, std::ios::end);
+  unsigned long long temp_bytes = temp_in.tellg();
+  if (!enable_preprocess) *input_bytes = temp_bytes;
+  temp_in.seekg(0, std::ios::beg);
+
+  WriteHeader(temp_bytes, &data_out);
+  Compress(temp_bytes, &temp_in, &data_out, output_bytes);
+  temp_in.close();
+  data_out.close();
+  if (enable_preprocess) remove(temp_path.c_str());
+  return true;
+}
+
+bool RunDecompression(bool enable_preprocess, const std::string& input_path,
+    const std::string& temp_path, const std::string& output_path,
+    FILE* dictionary, unsigned long long* input_bytes,
+    unsigned long long* output_bytes) {
+  std::ifstream data_in(input_path, std::ios::in | std::ios::binary);
+  if (!data_in.is_open()) return false;
+
+  data_in.seekg(0, std::ios::end);
+  *input_bytes = data_in.tellg();
+  data_in.seekg(0, std::ios::beg);
+  ReadHeader(&data_in, output_bytes);
+
+  if (*output_bytes == 0) {  // undo store
+    if (!enable_preprocess) return false;
+    data_in.close();
+    FILE* in = fopen(input_path.c_str(), "rb");
+    if (!in) return false;
+    FILE* data_out = fopen(output_path.c_str(), "wb");
+    if (!data_out) return false;
+    fseek(in, 5L, SEEK_SET);
+    preprocessor::decode(in, data_out, temp_path, dictionary);
+    fseek(data_out, 0L, SEEK_END);
+    *output_bytes = ftell(data_out);
+    fclose(in);
+    fclose(data_out);
+    return true;
+  }
+
+  std::ofstream temp_out(temp_path, std::ios::out | std::ios::binary);
+  if (!temp_out.is_open()) return false;
+
+  Decompress(*output_bytes, &data_in, &temp_out);
+  data_in.close();
+  temp_out.close();
+
+  if (enable_preprocess) {
+    FILE* temp_in = fopen(temp_path.c_str(), "rb");
+    if (!temp_in) return false;
+    FILE* data_out = fopen(output_path.c_str(), "wb");
+    if (!data_out) return false;
+
+    preprocessor::decode(temp_in, data_out, temp_path, dictionary);
+    fseek(data_out, 0L, SEEK_END);
+    *output_bytes = ftell(data_out);
+    fclose(temp_in);
+    fclose(data_out);
+    remove(temp_path.c_str());
+  }
+  return true;
+}
+
+int main(int argc, char* argv[]) {
+  if (argc < 4 || argc > 5 || argv[1][0] != '-' ||
+      (argv[1][1] != 'c' && argv[1][1] != 'd' && argv[1][1] != 's')) {
+    return Help();
+  }
+
+  clock_t start = clock();
+
+  bool enable_preprocess = false;
+  std::string input_path = argv[2];
+  std::string output_path = argv[3];
+  FILE* dictionary = NULL;
+  if (argc == 5) {
+    enable_preprocess = true;
+    dictionary = fopen(argv[2], "rb");
+    if (!dictionary) return Help();
+    input_path = argv[3];
+    output_path = argv[4];
+  }
+
+  std::string temp_path = output_path;
+  if (enable_preprocess) temp_path += ".lstm.temp";
+
+  unsigned long long input_bytes = 0, output_bytes = 0;
+
+  if (argv[1][1] == 's') {
+    if (!enable_preprocess) return Help();
+    if (!Store(input_path, temp_path, output_path, dictionary, &input_bytes,
+        &output_bytes)) {
+      return Help();
+    }
+  } else if (argv[1][1] == 'c') {
+    if (!RunCompression(enable_preprocess, input_path, temp_path, output_path,
+        dictionary, &input_bytes, &output_bytes)) {
+      return Help();
+    }
+  } else {
+    if (!RunDecompression(enable_preprocess, input_path, temp_path, output_path,
+        dictionary, &input_bytes, &output_bytes)) {
+      return Help();
+    }
+  }
+
+  printf("\r%lld bytes -> %lld bytes in %1.2f s.\n",
+      input_bytes, output_bytes,
+      ((double)clock() - start) / CLOCKS_PER_SEC);
+
+  if (argv[1][1] == 'c') {
+    double cross_entropy = output_bytes;
+    cross_entropy /= input_bytes;
+    cross_entropy *= 8;
+    printf("cross entropy: %.3f\n", cross_entropy);
+  }
+
+  return 0;
 }
