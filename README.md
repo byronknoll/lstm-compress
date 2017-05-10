@@ -5,7 +5,7 @@ lstm-compress is free software distributed under the GNU General Public License.
 
 In Linux or OS X, use "make" to compile lstm-compress using g++. In Windows, lstm-compress can be compiled with MinGW (http://nuwen.net/mingw.html) or Cygwin (https://www.cygwin.com).
 
-When running lstm-compress, it is usually recommended to enable preprocessing with "dictionary/english.dic". For most files this will improve compression rate.
+When running lstm-compress, it is usually recommended to enable preprocessing with "dictionary/english.dic".
 
 lstm-compress can only compress/decompress single files. To compress multiple files or directories, create an archive file using "tar" (or some similar tool).
 
