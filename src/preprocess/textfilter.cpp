@@ -58,7 +58,7 @@
 
 using namespace std;
 
-int word_hash[HASH_TABLE_SIZE];
+int* word_hash = new int[HASH_TABLE_SIZE];
 
 typedef unsigned int uint;
 typedef unsigned char uc;

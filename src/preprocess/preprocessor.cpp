@@ -414,6 +414,7 @@ void encode(FILE* in, FILE* out, int n, string temp_path, FILE* dictionary) {
   if (text_fraction > 0.95) {
     fprintf(out, "%c%c%c%c%c", TEXT, n>>24, n>>16, n>>8, n);    
     encode_text(in, out, n, temp_path, dictionary);
+    delete[] word_hash;
     return;
   }
 
@@ -436,6 +437,7 @@ void encode(FILE* in, FILE* out, int n, string temp_path, FILE* dictionary) {
     type=nextType;
     begin=end;
   }
+  delete[] word_hash;
 }
 
 int decode2(FILE* in, string temp_path, FILE* dictionary) {
@@ -471,10 +473,12 @@ void decode(FILE* in, FILE* out, string temp_path, FILE* dictionary) {
         fclose(wrt_temp);
         remove(path.c_str());
       }
+      delete[] word_hash;
       return;
     }
     putc(result, out);
   }
+  delete[] word_hash;
 }
 
 }
