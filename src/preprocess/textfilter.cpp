@@ -54,7 +54,7 @@
 #define PRINT_CODEWORDS(data) ;
 #define PRINT_DICT(data) ;
 
-#define HASH_TABLE_SIZE (1<<21)
+#define HASH_TABLE_SIZE (1<<20)
 
 using namespace std;
 
