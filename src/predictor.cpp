@@ -1,7 +1,7 @@
 #include "predictor.h"
 #include "lstm/byte-model.h"
 
-Predictor::Predictor() : lstm_(40, 3, 10, 0.1) {
+Predictor::Predictor() : lstm_(80, 3, 20, 0.05) {
   srand(0xDEADBEEF);
 }
 
