@@ -61,6 +61,13 @@ const std::valarray<float>& Layer::ForwardPass(const std::valarray<float>&
   return hidden_;
 }
 
+void ClipGradients(std::valarray<float>* arr) {
+  for (unsigned int i = 0; i < arr->size(); ++i) {
+    if ((*arr)[i] < -10) (*arr)[i] = -10;
+    else if ((*arr)[i] > 10) (*arr)[i] = 10;
+  }
+}
+
 const std::valarray<float>& Layer::BackwardPass(const std::valarray<float>&
     input, const std::valarray<float>& hidden_error, int epoch) {
   if (epoch == (int)horizon_ - 1) {
@@ -113,6 +120,10 @@ const std::valarray<float>& Layer::BackwardPass(const std::valarray<float>&
       }
     }
   }
+
+  ClipGradients(&state_error_);
+  ClipGradients(&stored_error_);
+  ClipGradients(&hidden_error_);
 
   for (unsigned int i = 0; i < input_node_.size(); ++i) {
     forget_gate_update_[i] += (learning_rate_ * forget_gate_error_[i]) * input;
