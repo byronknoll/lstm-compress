@@ -1,5 +1,5 @@
 # lstm-compress
-Data compression using LSTM. This project uses the same LSTM and preprocessing code as cmix (https://github.com/byronknoll/cmix). All of the other cmix models are removed, so the compression is performed solely using LSTM.
+Data compression using LSTM. This project uses the same LSTM and preprocessing code as cmix (https://github.com/byronknoll/cmix). All of the other cmix models are removed, so the compression is performed using only LSTM.
 
 lstm-compress is free software distributed under the GNU General Public License.
 
