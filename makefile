@@ -4,8 +4,8 @@ LFLAGS = -std=c++11 -Wall
 
 OBJS = build/preprocessor.o build/encoder.o build/decoder.o build/predictor.o build/byte-model.o build/lstm.o build/layer.o
 
-all: CFLAGS += -Ofast -march=native -s
-all: LFLAGS += -Ofast -march=native -s
+all: CFLAGS += -O3 -march=native -s
+all: LFLAGS += -O3 -march=native -s
 all: build lstm-compress
 
 debug: CFLAGS += -ggdb
