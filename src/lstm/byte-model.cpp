@@ -3,8 +3,8 @@
 
 ByteModel::ByteModel(unsigned int num_cells, unsigned int num_layers,
     int horizon, float learning_rate) : top_(255), mid_(0), bot_(0),
-    probs_(1.0 / 256, 256), bit_context_(1), lstm_(0, num_cells, num_layers,
-    horizon, learning_rate) {}
+    probs_(1.0 / 256, 256), bit_context_(1), lstm_(0, 256, num_cells,
+    num_layers, horizon, learning_rate) {}
 
 float ByteModel::Predict() {
   float num = 0, denom = 0;
