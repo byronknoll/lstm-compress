@@ -6,8 +6,7 @@
 
 Layer::Layer(unsigned int input_size, unsigned int auxiliary_input_size,
     unsigned int output_size, unsigned int num_cells, int horizon,
-    float learning_rate) : state_(num_cells), hidden_(num_cells),
-    hidden_error_(num_cells), output_gate_error_(num_cells),
+    float learning_rate) : state_(num_cells), output_gate_error_(num_cells),
     state_error_(num_cells), input_node_error_(num_cells),
     input_gate_error_(num_cells), forget_gate_error_(num_cells),
     stored_error_(num_cells),
@@ -30,7 +29,7 @@ Layer::Layer(unsigned int input_size, unsigned int auxiliary_input_size,
     output_size_(output_size) {
   float low = -0.2;
   float range = 0.4;
-  for (unsigned int i = 0; i < forget_gate_.size(); ++i) {
+  for (unsigned int i = 0; i < num_cells_; ++i) {
     for (unsigned int j = 0; j < forget_gate_[i].size(); ++j) {
       forget_gate_[i][j] = low + Rand() * range;
       input_node_[i][j] = low + Rand() * range;
@@ -41,48 +40,52 @@ Layer::Layer(unsigned int input_size, unsigned int auxiliary_input_size,
   }
 }
 
-const std::valarray<float>& Layer::ForwardPass(const std::valarray<float>&
-    input) {
+void Layer::ForwardPass(const std::valarray<float>& input, int input_symbol,
+    std::valarray<float>* hidden, int hidden_start) {
   last_state_[epoch_] = state_;
-  for (unsigned int i = 0; i < state_.size(); ++i) {
-    forget_gate_state_[epoch_][i] = Logistic(std::inner_product(&input[0],
-        &input[input.size()], &forget_gate_[i][0], 0.0));
-    state_[i] *= forget_gate_state_[epoch_][i];
+  for (unsigned int i = 0; i < num_cells_; ++i) {
+    forget_gate_state_[epoch_][i] = Logistic(std::inner_product(
+        &input[0], &input[input.size()],
+        &forget_gate_[i][output_size_], forget_gate_[i][input_symbol]));
     input_node_state_[epoch_][i] = tanh(std::inner_product(&input[0],
-        &input[input.size()], &input_node_[i][0], 0.0));
-    input_gate_state_[epoch_][i] = Logistic(std::inner_product(&input[0],
-        &input[input.size()], &input_gate_[i][0], 0.0));
-    state_[i] += input_node_state_[epoch_][i] * input_gate_state_[epoch_][i];
-    tanh_state_[epoch_][i] = tanh(state_[i]);
-    output_gate_state_[epoch_][i] = Logistic(std::inner_product(&input[0],
-        &input[input.size()], &output_gate_[i][0], 0.0));
-    hidden_[i] = output_gate_state_[epoch_][i] * tanh_state_[epoch_][i];
+        &input[input.size()], &input_node_[i][output_size_],
+        input_node_[i][input_symbol]));
+    input_gate_state_[epoch_][i] = Logistic(std::inner_product(
+        &input[0], &input[input.size()],
+        &input_gate_[i][output_size_], input_gate_[i][input_symbol]));
+    output_gate_state_[epoch_][i] = Logistic(std::inner_product(
+        &input[0], &input[input.size()],
+        &output_gate_[i][output_size_], output_gate_[i][input_symbol]));
   }
+  state_ *= forget_gate_state_[epoch_];
+  state_ += input_node_state_[epoch_] * input_gate_state_[epoch_];
+  tanh_state_[epoch_] = tanh(state_);
+  std::slice slice = std::slice(hidden_start, num_cells_, 1);
+  (*hidden)[slice] = output_gate_state_[epoch_] * tanh_state_[epoch_];
   ++epoch_;
   if (epoch_ == horizon_) epoch_ = 0;
-  return hidden_;
 }
 
 void ClipGradients(std::valarray<float>* arr) {
   for (unsigned int i = 0; i < arr->size(); ++i) {
-    if ((*arr)[i] < -1) (*arr)[i] = -1;
-    else if ((*arr)[i] > 1) (*arr)[i] = 1;
+    if ((*arr)[i] < -10) (*arr)[i] = -10;
+    else if ((*arr)[i] > 10) (*arr)[i] = 10;
   }
 }
 
-const std::valarray<float>& Layer::BackwardPass(const std::valarray<float>&
-    input, const std::valarray<float>& hidden_error, int epoch) {
+void Layer::BackwardPass(const std::valarray<float>&input, int epoch,
+    int layer, int input_symbol, std::valarray<float>* hidden_error) {
   if (epoch == (int)horizon_ - 1) {
-    stored_error_ = hidden_error;
+    stored_error_ = *hidden_error;
     state_error_ = 0;
-    for (unsigned int i = 0; i < input_node_.size(); ++i) {
+    for (unsigned int i = 0; i < num_cells_; ++i) {
       forget_gate_update_[i] = 0;
       input_node_update_[i] = 0;
       input_gate_update_[i] = 0;
       output_gate_update_[i] = 0;
     }
   } else {
-    stored_error_ += hidden_error;
+    stored_error_ += *hidden_error;
   }
 
   output_gate_error_ = tanh_state_[epoch] * stored_error_ *
@@ -96,15 +99,15 @@ const std::valarray<float>& Layer::BackwardPass(const std::valarray<float>&
   forget_gate_error_ = state_error_ * last_state_[epoch] *
       forget_gate_state_[epoch] * (1.0f - forget_gate_state_[epoch]);
 
-  hidden_error_ = 0;
-  if (input.size() > output_size_ + 1 + num_cells_ + input_size_) {
+  *hidden_error = 0;
+  if (layer > 0) {
     int offset = output_size_ + num_cells_ + input_size_;
-    for (unsigned int i = 0; i < input_node_.size(); ++i) {
-      for (unsigned int j = offset; j < input.size() - 1; ++j) {
-        hidden_error_[j-offset] += input_node_[i][j] * input_node_error_[i];
-        hidden_error_[j-offset] += input_gate_[i][j] * input_gate_error_[i];
-        hidden_error_[j-offset] += forget_gate_[i][j] * forget_gate_error_[i];
-        hidden_error_[j-offset] += output_gate_[i][j] * output_gate_error_[i];
+    for (unsigned int i = 0; i < num_cells_; ++i) {
+      for (unsigned int j = offset; j < offset + num_cells_; ++j) {
+        (*hidden_error)[j-offset] += input_node_[i][j] * input_node_error_[i];
+        (*hidden_error)[j-offset] += input_gate_[i][j] * input_gate_error_[i];
+        (*hidden_error)[j-offset] += forget_gate_[i][j] * forget_gate_error_[i];
+        (*hidden_error)[j-offset] += output_gate_[i][j] * output_gate_error_[i];
       }
     }
   }
@@ -112,8 +115,8 @@ const std::valarray<float>& Layer::BackwardPass(const std::valarray<float>&
   if (epoch > 0) {
     state_error_ *= forget_gate_state_[epoch];
     stored_error_ = 0;
-    for (unsigned int i = 0; i < input_node_.size(); ++i) {
-      int offset = output_size_ + input_size_;
+    int offset = output_size_ + input_size_;
+    for (unsigned int i = 0; i < num_cells_; ++i) {
       for (unsigned int j = offset; j < offset + num_cells_; ++j) {
         stored_error_[j-offset] += input_node_[i][j] * input_node_error_[i];
         stored_error_[j-offset] += input_gate_[i][j] * input_gate_error_[i];
@@ -125,21 +128,33 @@ const std::valarray<float>& Layer::BackwardPass(const std::valarray<float>&
 
   ClipGradients(&state_error_);
   ClipGradients(&stored_error_);
-  ClipGradients(&hidden_error_);
+  ClipGradients(hidden_error);
 
-  for (unsigned int i = 0; i < input_node_.size(); ++i) {
-    forget_gate_update_[i] += (learning_rate_ * forget_gate_error_[i]) * input;
-    input_node_update_[i] += (learning_rate_ * input_node_error_[i]) * input;
-    input_gate_update_[i] += (learning_rate_ * input_gate_error_[i]) * input;
-    output_gate_update_[i] += (learning_rate_ * output_gate_error_[i]) * input;
+  std::slice slice = std::slice(output_size_, input.size(), 1);
+  for (unsigned int i = 0; i < num_cells_; ++i) {
+    forget_gate_update_[i][slice] += (learning_rate_ * forget_gate_error_[i]) *
+        input;
+    input_node_update_[i][slice] += (learning_rate_ * input_node_error_[i]) *
+        input;
+    input_gate_update_[i][slice] += (learning_rate_ * input_gate_error_[i]) *
+        input;
+    output_gate_update_[i][slice] += (learning_rate_ * output_gate_error_[i]) *
+        input;
+    forget_gate_update_[i][input_symbol] += learning_rate_ *
+        forget_gate_error_[i];
+    input_node_update_[i][input_symbol] += learning_rate_ *
+        input_node_error_[i];
+    input_gate_update_[i][input_symbol] += learning_rate_ *
+        input_gate_error_[i];
+    output_gate_update_[i][input_symbol] += learning_rate_ *
+        output_gate_error_[i];
   }
   if (epoch == 0) {
-    for (unsigned int i = 0; i < input_node_.size(); ++i) {
+    for (unsigned int i = 0; i < num_cells_; ++i) {
         forget_gate_[i] += forget_gate_update_[i];
         input_node_[i] += input_node_update_[i];
         input_gate_[i] += input_gate_update_[i];
         output_gate_[i] += output_gate_update_[i];
     }
   }
-  return hidden_error_;
 }

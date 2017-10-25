@@ -5,12 +5,13 @@
 
 class Predictor {
  public:
-  Predictor();
+  Predictor(const std::vector<bool>& vocab);
   float Predict();
   void Perceive(int bit);
 
  private:
-  ByteModel lstm_;
+  std::unique_ptr<ByteModel> lstm_;
+  std::vector<bool> vocab_;
 };
 
 #endif

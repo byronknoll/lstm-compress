@@ -1,18 +1,25 @@
 #include "byte-model.h"
 #include "lstm.h"
 
+#include <numeric>
+
 ByteModel::ByteModel(unsigned int num_cells, unsigned int num_layers,
-    int horizon, float learning_rate) : top_(255), mid_(0), bot_(0),
-    probs_(1.0 / 256, 256), bit_context_(1), lstm_(0, 256, num_cells,
-    num_layers, horizon, learning_rate) {}
+    int horizon, float learning_rate, const std::vector<bool>& vocab,
+    unsigned int vocab_size) : top_(255), mid_(0), bot_(0),
+    byte_map_(0, 256), probs_(1.0 / 256, 256), bit_context_(1),
+    lstm_(0, vocab_size, num_cells, num_layers, horizon, learning_rate),
+    vocab_(vocab) {
+  int offset = 0;
+  for (int i = 0; i < 256; ++i) {
+    byte_map_[i] = offset;
+    if (vocab_[i]) ++offset;
+  }
+}
 
 float ByteModel::Predict() {
-  float num = 0, denom = 0;
   mid_ = bot_ + ((top_ - bot_) / 2);
-  for (int i = bot_; i <= top_; ++i) {
-    denom += probs_[i];
-    if (i > mid_) num += probs_[i];
-  }
+  float num = std::accumulate(&probs_[mid_ + 1], &probs_[top_ + 1], 0.0f);
+  float denom = std::accumulate(&probs_[bot_], &probs_[mid_ + 1], num);
   if (denom == 0) return 0.5;
   return num / denom;
 }
@@ -26,7 +33,16 @@ void ByteModel::Perceive(int bit) {
   bit_context_ += bit_context_ + bit;
   if (bit_context_ >= 256) {
     bit_context_ -= 256;
-    probs_ = lstm_.Perceive(bit_context_);
+    const auto& output = lstm_.Perceive(byte_map_[bit_context_]);
+    int offset = 0;
+    for (int i = 0; i < 256; ++i) {
+      if (vocab_[i]) {
+        probs_[i] = output[offset];
+        ++offset;
+      } else {
+        probs_[i] = 0;
+      }
+    }
     bit_context_ = 1;
     top_ = 255;
     bot_ = 0;

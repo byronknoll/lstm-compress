@@ -54,11 +54,9 @@
 #define PRINT_CODEWORDS(data) ;
 #define PRINT_DICT(data) ;
 
-#define HASH_TABLE_SIZE (1<<20)
-
 using namespace std;
 
-int* word_hash = new int[HASH_TABLE_SIZE];
+int* word_hash;
 
 typedef unsigned int uint;
 typedef unsigned char uc;
