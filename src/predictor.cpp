@@ -7,7 +7,7 @@ Predictor::Predictor(const std::vector<bool>& vocab) : vocab_(vocab) {
   for (unsigned int i = 0; i < vocab_.size(); ++i) {
     if (vocab_[i]) ++vocab_size;
   }
-  lstm_.reset(new ByteModel(80, 3, 20, 0.05, vocab_, vocab_size));
+  lstm_.reset(new ByteModel(90, 3, 10, 0.05, vocab_, vocab_size));
 }
 
 float Predictor::Predict() {
