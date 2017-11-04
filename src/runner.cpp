@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <cstdlib>
 #include <vector>
+#include <valarray>
 
 #include "preprocess/preprocessor.h"
 #include "coder/encoder.h"
@@ -11,6 +12,10 @@
 
 namespace {
   const int kMinVocabFileSize = 10000;
+
+  inline float Rand() {
+    return static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
+  }
 }
 
 int Help() {
@@ -25,6 +30,7 @@ int Help() {
   printf("Without preprocessing:\n");
   printf("    compress:   lstm-compress -c [input] [output]\n");
   printf("    decompress: lstm-compress -d [input] [output]\n");
+  printf("    generate:   lstm-compress -g [input] [output] [output size]\n");
   return -1;
 }
 
@@ -182,6 +188,79 @@ bool RunCompression(bool enable_preprocess, const std::string& input_path,
   return true;
 }
 
+bool RunGeneration(const std::string& input_path, const std::string& output_path,
+    int output_size) {
+  std::ifstream data_in(input_path, std::ios::in | std::ios::binary);
+  if (!data_in.is_open()) return false;
+
+  std::ofstream data_out(output_path, std::ios::out | std::ios::binary);
+  if (!data_out.is_open()) return false;
+
+  data_in.seekg(0, std::ios::end);
+  unsigned long long input_bytes = data_in.tellg();
+  data_in.seekg(0, std::ios::beg);
+  std::vector<bool> vocab(256, false);
+  ExtractVocab(input_bytes, &data_in, &vocab);
+  data_in.seekg(0, std::ios::beg);
+
+  int vocab_size = 0;
+  for (int i = 0; i < 256; ++i) {
+    if (vocab[i]) ++vocab_size;
+  }
+  int offset = 0;
+  std::vector<int> byte_map(256, 0), reverse_byte_map(vocab_size, 0);
+  for (int i = 0; i < 256; ++i) {
+    byte_map[i] = offset;
+    if (vocab[i]) ++offset;
+  }
+  offset = 0;
+  for (int i = 0; i < 256; ++i) {
+    if (vocab[i]) {
+      reverse_byte_map[offset] = i;
+      ++offset;
+    }
+  }
+
+  Lstm lstm(vocab_size, vocab_size, 90, 3, 10, 0.05);
+  std::valarray<float>& probs = lstm.Perceive(byte_map[data_in.get()]);
+  double entropy = log2(1.0/256);
+  unsigned long long percent = 1 + (input_bytes / 100);
+  for (unsigned int pos = 1; pos < input_bytes; ++pos) {
+    int c = byte_map[data_in.get()];
+    entropy += log2(probs[(unsigned char)c]);
+    probs = lstm.Perceive(c);
+    if (pos % percent == 0) {
+      printf("\rtraining: %lld%%", pos / percent);
+      fflush(stdout);
+    }
+  }
+  entropy = -entropy / input_bytes;
+  printf("\rcross entropy: %.4f\n", entropy);
+
+  data_in.close();
+
+  percent = 1 + (output_size / 100);
+  for (int i = 0; i < output_size; ++i) {
+    float r = Rand();
+    int c = 0;
+    for (; c < vocab_size; ++c) {
+      r -= probs[c];
+      if (r < 0) break;
+    }
+    probs = lstm.Predict(c);
+    data_out.put(reverse_byte_map[c]);
+    if (i % percent == 0) {
+      printf("\rgeneration: %lld%%", i / percent);
+      fflush(stdout);
+    }
+  }
+  printf("\rgeneration: 100%%\n");  
+
+  data_out.close();
+
+  return true;
+}
+
 bool RunDecompression(bool enable_preprocess, const std::string& input_path,
     const std::string& temp_path, const std::string& output_path,
     FILE* dictionary, unsigned long long* input_bytes,
@@ -234,7 +313,8 @@ bool RunDecompression(bool enable_preprocess, const std::string& input_path,
 
 int main(int argc, char* argv[]) {
   if (argc < 4 || argc > 5 || argv[1][0] != '-' ||
-      (argv[1][1] != 'c' && argv[1][1] != 'd' && argv[1][1] != 's')) {
+      (argv[1][1] != 'c' && argv[1][1] != 'd' && argv[1][1] != 's' &&
+      argv[1][1] != 'g')) {
     return Help();
   }
 
@@ -243,6 +323,16 @@ int main(int argc, char* argv[]) {
   bool enable_preprocess = false;
   std::string input_path = argv[2];
   std::string output_path = argv[3];
+
+  if (argv[1][1] == 'g') {
+    if (argc != 5) return Help();
+    int output_size = std::stoi(argv[4]);
+    if (!RunGeneration(input_path, output_path, output_size)) {
+      return Help();
+    }
+    return 0;
+  }
+
   FILE* dictionary = NULL;
   if (argc == 5) {
     enable_preprocess = true;
