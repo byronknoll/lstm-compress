@@ -68,8 +68,8 @@ void Layer::ForwardPass(const std::valarray<float>& input, int input_symbol,
 
 void ClipGradients(std::valarray<float>* arr) {
   for (unsigned int i = 0; i < arr->size(); ++i) {
-    if ((*arr)[i] < -10) (*arr)[i] = -10;
-    else if ((*arr)[i] > 10) (*arr)[i] = 10;
+    if ((*arr)[i] < -2) (*arr)[i] = -2;
+    else if ((*arr)[i] > 2) (*arr)[i] = 2;
   }
 }
 
