@@ -8,7 +8,7 @@
 class ByteModel {
  public:
   ByteModel(unsigned int num_cells, unsigned int num_layers, int horizon,
-      float learning_rate, const std::vector<bool>& vocab,
+      float learning_rate, float gradient_clip, const std::vector<bool>& vocab,
       unsigned int vocab_size);
   float Predict();
   void Perceive(int bit);

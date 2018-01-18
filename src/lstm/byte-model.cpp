@@ -4,11 +4,11 @@
 #include <numeric>
 
 ByteModel::ByteModel(unsigned int num_cells, unsigned int num_layers,
-    int horizon, float learning_rate, const std::vector<bool>& vocab,
-    unsigned int vocab_size) : top_(255), mid_(0), bot_(0),
-    byte_map_(0, 256), probs_(1.0 / 256, 256), bit_context_(1),
-    lstm_(0, vocab_size, num_cells, num_layers, horizon, learning_rate),
-    vocab_(vocab) {
+    int horizon, float learning_rate, float gradient_clip,
+    const std::vector<bool>& vocab, unsigned int vocab_size) : top_(255),
+    mid_(0), bot_(0), byte_map_(0, 256), probs_(1.0 / 256, 256),
+    bit_context_(1), lstm_(0, vocab_size, num_cells, num_layers, horizon,
+    learning_rate, gradient_clip), vocab_(vocab) {
   int offset = 0;
   for (int i = 0; i < 256; ++i) {
     byte_map_[i] = offset;

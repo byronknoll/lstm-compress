@@ -221,7 +221,7 @@ bool RunGeneration(const std::string& input_path, const std::string& output_path
     }
   }
 
-  Lstm lstm(vocab_size, vocab_size, 90, 3, 10, 0.05);
+  Lstm lstm(vocab_size, vocab_size, 90, 3, 10, 0.05, 2);
   std::valarray<float>& probs = lstm.Perceive(byte_map[data_in.get()]);
   double entropy = log2(1.0/256);
   unsigned long long percent = 1 + (input_bytes / 100);
