@@ -2,7 +2,7 @@ CC = g++
 CFLAGS = -std=c++11 -Wall -c
 LFLAGS = -std=c++11 -Wall
 
-OBJS = build/preprocessor.o build/encoder.o build/decoder.o build/predictor.o build/byte-model.o build/lstm.o build/layer.o
+OBJS = build/preprocessor.o build/encoder.o build/decoder.o build/predictor.o build/sigmoid.o build/byte-model.o build/lstm.o build/lstm-layer.o
 
 all: CFLAGS += -Ofast
 all: LFLAGS += -Ofast
@@ -30,11 +30,14 @@ build/predictor.o: src/predictor.h src/predictor.cpp src/lstm/byte-model.h
 build/byte-model.o: src/lstm/byte-model.h src/lstm/byte-model.cpp src/lstm/lstm.h
 	$(CC) $(CFLAGS) src/lstm/byte-model.cpp -o build/byte-model.o
 
-build/lstm.o: src/lstm/lstm.h src/lstm/lstm.cpp src/lstm/layer.h
+build/lstm.o: src/lstm/lstm.h src/lstm/lstm.cpp src/lstm/lstm-layer.h
 	$(CC) $(CFLAGS) src/lstm/lstm.cpp -o build/lstm.o
 
-build/layer.o: src/lstm/layer.h src/lstm/layer.cpp
-	$(CC) $(CFLAGS) src/lstm/layer.cpp -o build/layer.o
+build/lstm-layer.o: src/lstm/lstm-layer.h src/lstm/lstm-layer.cpp src/lstm/sigmoid.h
+	$(CC) $(CFLAGS) src/lstm/lstm-layer.cpp -o build/lstm-layer.o
+
+build/sigmoid.o: src/lstm/sigmoid.h src/lstm/sigmoid.cpp
+	$(CC) $(CFLAGS) src/lstm/sigmoid.cpp -o build/sigmoid.o
 
 build:
 	mkdir -p build/

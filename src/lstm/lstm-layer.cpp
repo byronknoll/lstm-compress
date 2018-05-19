@@ -1,10 +1,12 @@
-#include "layer.h"
+#include "lstm-layer.h"
+
+#include "sigmoid.h"
 
 #include <math.h>
 #include <algorithm>
 #include <numeric>
 
-Layer::Layer(unsigned int input_size, unsigned int auxiliary_input_size,
+LstmLayer::LstmLayer(unsigned int input_size, unsigned int auxiliary_input_size,
     unsigned int output_size, unsigned int num_cells, int horizon,
     float learning_rate, float gradient_clip) : state_(num_cells),
     output_gate_error_(num_cells), state_error_(num_cells),
@@ -40,20 +42,20 @@ Layer::Layer(unsigned int input_size, unsigned int auxiliary_input_size,
   }
 }
 
-void Layer::ForwardPass(const std::valarray<float>& input, int input_symbol,
+void LstmLayer::ForwardPass(const std::valarray<float>& input, int input_symbol,
     std::valarray<float>* hidden, int hidden_start) {
   last_state_[epoch_] = state_;
   for (unsigned int i = 0; i < num_cells_; ++i) {
-    forget_gate_state_[epoch_][i] = Logistic(std::inner_product(
+    forget_gate_state_[epoch_][i] = Sigmoid::Logistic(std::inner_product(
         &input[0], &input[input.size()],
         &forget_gate_[i][output_size_], forget_gate_[i][input_symbol]));
     input_node_state_[epoch_][i] = tanh(std::inner_product(&input[0],
         &input[input.size()], &input_node_[i][output_size_],
         input_node_[i][input_symbol]));
-    input_gate_state_[epoch_][i] = Logistic(std::inner_product(
+    input_gate_state_[epoch_][i] = Sigmoid::Logistic(std::inner_product(
         &input[0], &input[input.size()],
         &input_gate_[i][output_size_], input_gate_[i][input_symbol]));
-    output_gate_state_[epoch_][i] = Logistic(std::inner_product(
+    output_gate_state_[epoch_][i] = Sigmoid::Logistic(std::inner_product(
         &input[0], &input[input.size()],
         &output_gate_[i][output_size_], output_gate_[i][input_symbol]));
   }
@@ -66,14 +68,14 @@ void Layer::ForwardPass(const std::valarray<float>& input, int input_symbol,
   if (epoch_ == horizon_) epoch_ = 0;
 }
 
-void Layer::ClipGradients(std::valarray<float>* arr) {
+void LstmLayer::ClipGradients(std::valarray<float>* arr) {
   for (unsigned int i = 0; i < arr->size(); ++i) {
     if ((*arr)[i] < -gradient_clip_) (*arr)[i] = -gradient_clip_;
     else if ((*arr)[i] > gradient_clip_) (*arr)[i] = gradient_clip_;
   }
 }
 
-void Layer::BackwardPass(const std::valarray<float>&input, int epoch,
+void LstmLayer::BackwardPass(const std::valarray<float>&input, int epoch,
     int layer, int input_symbol, std::valarray<float>* hidden_error) {
   if (epoch == (int)horizon_ - 1) {
     stored_error_ = *hidden_error;

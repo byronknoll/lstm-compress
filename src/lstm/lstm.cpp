@@ -1,6 +1,7 @@
 #include "lstm.h"
 
 #include <numeric>
+#include <stdlib.h>
 
 Lstm::Lstm(unsigned int input_size, unsigned int output_size, unsigned int
     num_cells, unsigned int num_layers, int horizon, float learning_rate,
@@ -13,6 +14,7 @@ Lstm::Lstm(unsigned int input_size, unsigned int output_size, unsigned int
     output_(std::valarray<float>(1.0 / output_size, output_size), horizon),
     learning_rate_(learning_rate), num_cells_(num_cells), epoch_(0),
     horizon_(horizon), input_size_(input_size), output_size_(output_size) {
+  srand(69761);
   hidden_[hidden_.size() - 1] = 1;
   for (int epoch = 0; epoch < horizon; ++epoch) {
     layer_input_[epoch][0].resize(1 + num_cells + input_size);
@@ -21,9 +23,9 @@ Lstm::Lstm(unsigned int input_size, unsigned int output_size, unsigned int
     }
   }
   for (unsigned int i = 0; i < num_layers; ++i) {
-    layers_.push_back(std::unique_ptr<Layer>(new Layer(layer_input_[0][i].size()
-        + output_size, input_size_, output_size_, num_cells, horizon,
-        learning_rate, gradient_clip)));
+    layers_.push_back(std::unique_ptr<LstmLayer>(new LstmLayer(
+        layer_input_[0][i].size() + output_size, input_size_, output_size_,
+        num_cells, horizon, learning_rate, gradient_clip)));
   }
 }
 

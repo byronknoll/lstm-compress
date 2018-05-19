@@ -5,7 +5,7 @@
 #include <vector>
 #include <memory>
 
-#include "layer.h"
+#include "lstm-layer.h"
 
 class Lstm {
  public:
@@ -17,7 +17,7 @@ class Lstm {
   void SetInput(int index, float val);
 
  private:
-  std::vector<std::unique_ptr<Layer>> layers_;
+  std::vector<std::unique_ptr<LstmLayer>> layers_;
   std::vector<unsigned int> input_history_;
   std::valarray<float> hidden_, hidden_error_;
   std::valarray<std::valarray<std::valarray<float>>> layer_input_,

@@ -1,13 +1,13 @@
-#ifndef LAYER_H
-#define LAYER_H
+#ifndef LSTM_LAYER_H
+#define LSTM_LAYER_H
 
 #include <valarray>
 #include <stdlib.h>
 #include <math.h>
 
-class Layer {
+class LstmLayer {
  public:
-  Layer(unsigned int input_size, unsigned int auxiliary_input_size,
+  LstmLayer(unsigned int input_size, unsigned int auxiliary_input_size,
       unsigned int output_size, unsigned int num_cells, int horizon,
       float learning_rate, float gradient_clip);
   void ForwardPass(const std::valarray<float>& input, int input_symbol,
@@ -17,7 +17,6 @@ class Layer {
   static inline float Rand() {
     return static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
   }
-  static inline float Logistic(float val) { return 1 / (1 + exp(-val)); }
 
  private:
   std::valarray<float> state_, output_gate_error_, state_error_,
