@@ -2,7 +2,7 @@ CC = g++
 CFLAGS = -std=c++11 -Wall -c
 LFLAGS = -std=c++11 -Wall
 
-OBJS = build/preprocessor.o build/encoder.o build/decoder.o build/predictor.o build/sigmoid.o build/byte-model.o build/lstm.o build/lstm-layer.o
+OBJS = build/preprocessor.o build/dictionary.o build/encoder.o build/decoder.o build/predictor.o build/sigmoid.o build/byte-model.o build/lstm.o build/lstm-layer.o
 
 all: CFLAGS += -Ofast
 all: LFLAGS += -Ofast
@@ -15,7 +15,10 @@ debug: build lstm-compress
 lstm-compress: $(OBJS) src/runner.cpp
 	$(CC) $(LFLAGS) $(OBJS) src/runner.cpp -o lstm-compress
 
-build/preprocessor.o: src/preprocess/preprocessor.h src/preprocess/preprocessor.cpp src/preprocess/textfilter.cpp
+build/dictionary.o: src/preprocess/dictionary.h src/preprocess/dictionary.cpp
+	$(CC) $(CFLAGS) src/preprocess/dictionary.cpp -o build/dictionary.o
+
+build/preprocessor.o: src/preprocess/preprocessor.h src/preprocess/preprocessor.cpp src/preprocess/dictionary.h
 	$(CC) $(CFLAGS) src/preprocess/preprocessor.cpp -o build/preprocessor.o
 
 build/encoder.o: src/coder/encoder.h src/coder/encoder.cpp src/predictor.h

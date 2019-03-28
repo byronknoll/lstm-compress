@@ -1,34 +1,11 @@
-// This preprocessor is adapted from paq8l, paq8hp12any and paq8px_v101.
+// This preprocessor is adapted from paq8l, paq8hp12any and paq8px.
 
 #include <vector>
 #include <cstdlib>
 #include <string.h>
 
-#define preprocFlag 1220
-#define OPTION_UTF8							1
-#define OPTION_USE_NGRAMS					2
-#define OPTION_CAPITAL_CONVERSION			4
-#define OPTION_WORD_SURROROUNDING_MODELING	8
-#define OPTION_SPACE_AFTER_EOL				16
-#define OPTION_EOL_CODING					32
-#define OPTION_NORMAL_TEXT_FILTER			64
-#define OPTION_USE_DICTIONARY				128
-#define OPTION_RECORD_INTERLEAVING			256
-#define OPTION_DNA_QUARTER_BYTE				512
-#define OPTION_TRY_SHORTER_WORD				1024
-#define OPTION_TO_LOWER_AFTER_PUNCTUATION	2048
-#define OPTION_SPACELESS_WORDS				4096
-#define OPTION_ADD_SYMBOLS_0_5				8192
-#define OPTION_ADD_SYMBOLS_14_31			16384
-#define OPTION_ADD_SYMBOLS_A_Z				32768
-#define OPTION_ADD_SYMBOLS_MISC				65536
-#define OPTION_SPACE_AFTER_CC_FLAG			131072
-#define IF_OPTION(option) ((preprocFlag & option)!=0)
-
-#define HASH_TABLE_SIZE (1<<20)
-
-#include "textfilter.cpp"
 #include "preprocessor.h"
+#include "dictionary.h"
 
 namespace preprocessor {
 
@@ -58,7 +35,7 @@ bool IsAscii(int byte) {
 int info;
 
 Filetype detect(FILE* in, int n, Filetype type) {
-  U32 buf1=0, buf0=0;
+  U32 buf2=0, buf1=0, buf0=0;
   long start=ftell(in);
 
   // For EXE detection
@@ -86,10 +63,15 @@ Filetype detect(FILE* in, int n, Filetype type) {
   // For TGA detection
   uint64_t tga=0;
   int tgaid=0, tgaw=0, tgah=0;
+  // For PBM, PGM, PPM, PAM detection
+  uint64_t pgm=0;
+  int pgmcomment=0,pgmw=0,pgmh=0,pgm_ptr=0,pgmc=0,pgmn=0,pamatr=0,pamd=0;
+  char pgm_buf[32];
 
   for (int i=0; i<n; ++i) {
     int c=getc(in);
     if (c==EOF) return (Filetype)(-1);
+    buf2=buf2<<8|buf1>>24;
     buf1=buf1<<8|buf0>>24;
     buf0=buf0<<8|c;
 
@@ -190,6 +172,46 @@ Filetype detect(FILE* in, int n, Filetype type) {
           IMG_DET(IMAGE24, (tga-7), 18+tgaid, tgaw*3, tgah);
       }
     }
+
+    // Detect .pbm .pgm .ppm .pam image
+    if ((buf0&0xfff0ff)==0x50300a) {
+      pgmn=(buf0&0xf00)>>8;
+      if ((pgmn>=4 && pgmn<=6) || pgmn==7) pgm=i,pgm_ptr=pgmw=pgmh=pgmc=pgmcomment=pamatr=pamd=0;
+    }
+    if (pgm) {
+      if (i-pgm==1 && c==0x23) pgmcomment=1; //pgm comment
+      if (!pgmcomment && pgm_ptr) {
+        int s=0;
+        if (pgmn==7) {
+           if ((buf1&0xdfdf)==0x5749 && (buf0&0xdfdfdfff)==0x44544820) pgm_ptr=0, pamatr=1; // WIDTH
+           if ((buf1&0xdfdfdf)==0x484549 && (buf0&0xdfdfdfff)==0x47485420) pgm_ptr=0, pamatr=2; // HEIGHT
+           if ((buf1&0xdfdfdf)==0x4d4158 && (buf0&0xdfdfdfff)==0x56414c20) pgm_ptr=0, pamatr=3; // MAXVAL
+           if ((buf1&0xdfdf)==0x4445 && (buf0&0xdfdfdfff)==0x50544820) pgm_ptr=0, pamatr=4; // DEPTH
+           if ((buf2&0xdf)==0x54 && (buf1&0xdfdfdfdf)==0x55504c54 && (buf0&0xdfdfdfff)==0x59504520) pgm_ptr=0, pamatr=5; // TUPLTYPE
+           if ((buf1&0xdfdfdf)==0x454e44 && (buf0&0xdfdfdfff)==0x4844520a) pgm_ptr=0, pamatr=6; // ENDHDR
+           if (c==0x0a) {
+             if (pamatr==0) pgm=0;
+             else if (pamatr<5) s=pamatr;
+             if (pamatr!=6) pamatr=0;
+           }
+        } else if (c==0x20 && !pgmw) s=1;
+        else if (c==0x0a && !pgmh) s=2;
+        else if (c==0x0a && !pgmc && pgmn!=4) s=3;
+        if (s) {
+          pgm_buf[pgm_ptr++]=0;
+          int v=atoi(pgm_buf);
+          if (s==1) pgmw=v; else if (s==2) pgmh=v; else if (s==3) pgmc=v; else if (s==4) pamd=v;
+          if (v==0 || (s==3 && v>255)) pgm=0; else pgm_ptr=0;
+        }
+      }
+      if (!pgmcomment) pgm_buf[pgm_ptr++]=c;
+      if (pgm_ptr>=32) pgm=0;
+      if (pgmcomment && c==0x0a) pgmcomment=0;
+      if (pgmw && pgmh && !pgmc && pgmn==4) IMG_DET_NOHDR(IMAGE1,i-pgm+3,(pgmw+7)/8,pgmh);
+      if (pgmw && pgmh && pgmc && (pgmn==5 || (pgmn==7 && pamd==1 && pamatr==6))) IMG_DET_NOHDR(IMAGE8GRAY,i-pgm+3,pgmw,pgmh);
+      if (pgmw && pgmh && pgmc && (pgmn==6 || (pgmn==7 && pamd==3 && pamatr==6))) IMG_DET_NOHDR(IMAGE24,i-pgm+3,pgmw*3,pgmh);
+      if (pgmw && pgmh && pgmc && (pgmn==7 && pamd==4 && pamatr==6)) IMG_DET_NOHDR(IMAGE32,i-pgm+3,pgmw*4,pgmh);
+    }
     
     // Detect .tiff image
     if (buf1==0x49492a00 && n>i+(int)bswap(buf0)) {
@@ -243,20 +265,24 @@ int decode_default(FILE* in) {
   return getc(in);
 }
 
-void encode_jpeg(FILE* in, FILE* out, int len) {
-  while (len--) putc(getc(in), out);
-}
-
-int decode_jpeg(FILE* in) {
-  return getc(in);
-}
-
+#define RGB565_MIN_RUN 63
 void encode_bmp(FILE* in, FILE* out, int len, int width) {
   fprintf(out, "%c%c%c%c", width>>24, width>>16, width>>8, width);
-  int r,g,b;
+  int r,g,b, total=0;
+  bool isPossibleRGB565 = true;
   for (int i=0; i<len/width; i++) {
     for (int j=0; j<width/3; j++) {
       b=getc(in), g=getc(in), r=getc(in);
+      if (isPossibleRGB565) {
+        int pTotal=total;
+        total=std::min<int>(total+1, 0xFFFF)*((b&7)==((b&8)-((b>>3)&1)) && (g&3)==((g&4)-((g>>2)&1)) && (r&7)==((r&8)-((r>>3)&1)));
+        if (total>RGB565_MIN_RUN || pTotal>=RGB565_MIN_RUN) {
+          b^=(b&8)-((b>>3)&1);
+          g^=(g&4)-((g>>2)&1);
+          r^=(r&8)-((r>>3)&1);
+        }
+        isPossibleRGB565=total>0;
+      }
       putc(g, out);
       putc(g-r, out);
       putc(g-b, out);
@@ -266,13 +292,15 @@ void encode_bmp(FILE* in, FILE* out, int len, int width) {
 }
 
 int decode_bmp(FILE *in, int &reset) {
-  static int width = 0;
+  static int width = 0, total = 0;
+  static bool isPossibleRGB565 = true;
   if (width == 0 || reset) {
     width=getc(in)<<24;
     width|=getc(in)<<16;
     width|=getc(in)<<8;
     width|=getc(in);
-    reset=0;
+    reset=total=0;
+    isPossibleRGB565 = true;
   }
 
   static int r,g,b;
@@ -280,17 +308,26 @@ int decode_bmp(FILE *in, int &reset) {
 
   if (state1 < width/3) {
     if (state2 == 0) {
-      b=getc(in), g=getc(in), r=getc(in);
+      g=getc(in), r=g-getc(in), b=g-getc(in);
       ++state2;
-      return (b-r)&255;
+      if (isPossibleRGB565){
+        if (total>=RGB565_MIN_RUN) {
+          b^=(b&8)-((b>>3)&1);
+          g^=(g&4)-((g>>2)&1);
+          r^=(r&8)-((r>>3)&1);
+        }
+        total=std::min<int>(total+1, 0xFFFF)*((b&7)==((b&8)-((b>>3)&1)) && (g&3)==((g&4)-((g>>2)&1)) && (r&7)==((r&8)-((r>>3)&1)));
+        isPossibleRGB565=total>0;
+      }
+      return b&255;
     } else if (state2 == 1) {
       ++state2;
-      return b;
+      return g;
     } else if (state2 == 2) {
       ++state1;
       if (width%3 == 0) state1 = 0;
       state2 = 0;
-      return (b-g)&255;
+      return r&255;
     }
   } else {
     ++state2;
@@ -369,90 +406,62 @@ int decode_exe(FILE* in) {
   return c[--q];
 }
 
-void encode_text(FILE* in, FILE* out, int len, string temp_path,
+void encode_text(FILE* in, FILE* out, int len, std::string temp_path,
     FILE* dictionary) {
-  string path1 = temp_path + "2";
-  FILE* temp_input = fopen(path1.c_str(), "wb+");
-  if (!temp_input) abort();
-
-  for (int i = 0; i < len; ++i) {
-    putc(getc(in), temp_input);
+  if (dictionary == NULL) {
+    putc(0, out);
+    for (int i = 0; i < len; ++i) {
+      putc(getc(in), out);
+    }
+    return;
   }
-  rewind(temp_input);
-
-  string path2 = temp_path + "3";
-  FILE* temp_output = fopen(path2.c_str(), "wb+");
+  std::string path = temp_path + "2";
+  FILE* temp_output = fopen(path.c_str(), "wb+");
   if (!temp_output) abort();
+  int orig_pos = ftell(in);
 
-  WRT wrt;
-  wrt.defaultSettings(0, NULL);
-  wrt.WRT_start_encoding(temp_input, temp_output, len, false, dictionary);
+  Dictionary dict(dictionary, true, false);
+  dict.Encode(in, len, temp_output);
 
   int size = ftell(temp_output);
   if (size > len - 50) {
-    for (int i = 0; i < 4; ++i) {
-      putc(0, out);
-    }
-    rewind(temp_input);
+    putc(0, out);
+    fseek(in, orig_pos, SEEK_SET);
     for (int i = 0; i < len; ++i) {
-      putc(getc(temp_input), out);
+      putc(getc(in), out);
     }
   } else {
+    putc(1, out);
     rewind(temp_output);
     for (int i = 0; i < size; ++i) {
       putc(getc(temp_output), out);
     }
   }
 
-  fclose(temp_input);
   fclose(temp_output);
-  remove(path1.c_str());
-  remove(path2.c_str());
+  remove(path.c_str());
 }
 
-FILE* wrt_temp;
-WRT* wrt_decoder = NULL;
+Dictionary* dict = NULL;
 bool wrt_enabled = true;
 
-void reset_text_decoder(FILE* in, string path) {
-  if (wrt_temp) {
-    fclose(wrt_temp);
-    remove(path.c_str());
-  }
-  wrt_temp = fopen(path.c_str(), "wb+");
-  if (!wrt_temp) abort();
-
-  unsigned int size = 0;
-  for (int i = 4; i != 0; --i) {
-    int c = getc(in);
-    size = size * 256 + c;
-    putc(c, wrt_temp);
-  }
-  if (size == 0) {
+void reset_text_decoder(FILE* in, FILE* dictionary) {
+  int c = getc(in);
+  if (c) {
+    wrt_enabled = true;
+    if (dict == NULL) dict = new Dictionary(dictionary, false, true);
+  } else {
     wrt_enabled = false;
-    return;
   }
-  wrt_enabled = true;
-  size -= 8;
-
-  for (unsigned int i = 0; i < size; ++i) {
-    putc(getc(in), wrt_temp);
-  }
-  rewind(wrt_temp);
-
-  if (wrt_decoder != NULL) delete wrt_decoder;
-  wrt_decoder = new WRT();
-  wrt_decoder->defaultSettings(0, NULL);
-  wrt_decoder->WRT_prepare_decoding();
 }
 
-int decode_text(FILE* in, FILE* dictionary) {
+int decode_text(FILE* in) {
   if (!wrt_enabled) return getc(in);
-  return wrt_decoder->WRT_decode_char(wrt_temp, NULL, 0, dictionary);
+  return dict->Decode(in);
 }
 
-void Encode(FILE* in, FILE* out, int n, string temp_path, FILE* dictionary) {
-  word_hash = new int[HASH_TABLE_SIZE];
+void Encode(FILE* in, FILE* out, int n, std::string temp_path,
+    FILE* dictionary) {
   Filetype type=DEFAULT;
   long begin=ftell(in);
 
@@ -477,7 +486,6 @@ void Encode(FILE* in, FILE* out, int n, string temp_path, FILE* dictionary) {
   if (text_fraction > 0.95) {
     fprintf(out, "%c%c%c%c%c", TEXT, n>>24, n>>16, n>>8, n);
     encode_text(in, out, n, temp_path, dictionary);
-    delete[] word_hash;
     return;
   }
 
@@ -489,7 +497,6 @@ void Encode(FILE* in, FILE* out, int n, string temp_path, FILE* dictionary) {
     if (len>0) {
       fprintf(out, "%c%c%c%c%c", type, len>>24, len>>16, len>>8, len);
       switch(type) {
-        case JPEG:    encode_jpeg(in, out, len); break;
         case IMAGE24: encode_bmp(in, out, len, info); break;
         case EXE:     encode_exe(in, out, len, begin); break;
         case TEXT:    encode_text(in, out, len, temp_path, dictionary); break;
@@ -504,16 +511,14 @@ void Encode(FILE* in, FILE* out, int n, string temp_path, FILE* dictionary) {
     type=nextType;
     begin=end;
   }
-  delete[] word_hash;
 }
 
 void NoPreprocess(FILE* in, FILE* out, int n) {
   fprintf(out, "%c%c%c%c%c", DEFAULT, n>>24, n>>16, n>>8, n);
   encode_default(in, out, n);
-  delete[] word_hash;
 }
 
-int decode2(FILE* in, string temp_path, FILE* dictionary) {
+int DecodeByte(FILE* in, FILE* dictionary) {
   static Filetype type=DEFAULT;
   static int len=0, reset=0;
   while (len==0) {
@@ -526,14 +531,13 @@ int decode2(FILE* in, string temp_path, FILE* dictionary) {
     len|=getc(in)<<8;
     len|=getc(in);
     if (len<0) len=1;
-    if (type == TEXT) reset_text_decoder(in, temp_path);
+    if (type == TEXT) reset_text_decoder(in, dictionary);
   }
   --len;
   switch (type) {
-    case JPEG:    return decode_jpeg(in);
     case IMAGE24: return decode_bmp(in, reset);
     case EXE:     return decode_exe(in);
-    case TEXT:    return decode_text(in, dictionary);
+    case TEXT:    return decode_text(in);
     default: {
       if (reset && HasInfo(type)){
         for (int i=info=0;i<4;i++) info=(info<<8)|getc(in); //read info
@@ -544,22 +548,15 @@ int decode2(FILE* in, string temp_path, FILE* dictionary) {
   }
 }
 
-void Decode(FILE* in, FILE* out, string temp_path, FILE* dictionary) {
-  word_hash = new int[HASH_TABLE_SIZE];
-  string path = temp_path + "2";
+void Decode(FILE* in, FILE* out, FILE* dictionary) {
   while (true) {
-    int result = decode2(in, path, dictionary);
+    int result = DecodeByte(in, dictionary);
     if (result == -1) {
-      if (wrt_temp) {
-        fclose(wrt_temp);
-        remove(path.c_str());
-      }
-      delete[] word_hash;
+      if (dict != NULL) delete dict;
       return;
     }
     putc(result, out);
   }
-  delete[] word_hash;
 }
 
 }
