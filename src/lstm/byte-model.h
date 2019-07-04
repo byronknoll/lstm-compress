@@ -4,12 +4,11 @@
 #include "lstm.h"
 
 #include <valarray>
+#include <memory>
 
 class ByteModel {
  public:
-  ByteModel(unsigned int num_cells, unsigned int num_layers, int horizon,
-      float learning_rate, float gradient_clip, const std::vector<bool>& vocab,
-      unsigned int vocab_size);
+  ByteModel(const std::vector<bool>& vocab, Lstm* lstm);
   float Predict();
   void Perceive(int bit);
 
@@ -18,7 +17,7 @@ class ByteModel {
   std::valarray<int> byte_map_;
   std::valarray<float> probs_;
   unsigned int bit_context_;
-  Lstm lstm_;
+  std::unique_ptr<Lstm> lstm_;
   const std::vector<bool>& vocab_;
 };
 
